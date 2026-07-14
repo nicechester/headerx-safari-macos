@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Logs
+*.log
+
+# Secrets
+HeaderX/password.txt
+*.p12
+*.cer
+*.provisionprofile
+
+# Build output
+build/
+*.dmg
+*.zip
+
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.moved-aside
+*.pbxproj.bak
