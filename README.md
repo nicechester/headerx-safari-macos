@@ -1,8 +1,10 @@
-# HeaderX
+# HeaderX for Safari
 
-A lightweight browser extension for Chrome (and other Chromium-based browsers) that injects custom HTTP headers into web requests. Perfect for local development, testing APIs, and adding authentication tokens on the fly.
+A lightweight Safari extension for macOS that injects custom HTTP headers into web requests. Perfect for local development, testing APIs, and adding authentication tokens on the fly.
 
-> Looking for Safari? Safari support lives in a separate project, since Safari extensions ship as a native macOS app and Safari's `declarativeNetRequest` only accepts standard header names.
+Safari ships web extensions inside a native macOS app, so HeaderX is distributed as a signed `.dmg` rather than an unpacked folder.
+
+> Looking for Chrome? Chromium-based browsers are supported by a separate build, since Safari's `declarativeNetRequest` only accepts standard header names.
 
 ## Features
 
@@ -16,12 +18,19 @@ A lightweight browser extension for Chrome (and other Chromium-based browsers) t
 
 ## Installation
 
-1. Clone or download this extension folder
-2. Open Chrome and go to `chrome://extensions/`
-3. Toggle **Developer mode** (top right corner)
-4. Click **Load unpacked**
-5. Select this folder
-6. The extension icon will appear in your toolbar
+Download the latest `HeaderX.dmg` from the **[Releases page](https://github.com/nicechester/headerx-safari-macos/releases)**, then:
+
+1. Open the downloaded `HeaderX.dmg` and drag **HeaderX.app** into your **Applications** folder.
+2. Launch **HeaderX.app** once. On first launch macOS may warn that it's from an unidentified developer — if so, right-click the app and choose **Open**, or approve it in **System Settings → Privacy & Security**.
+3. Open Safari and go to **Safari → Settings… (⌘,) → Extensions**.
+4. Check the box next to **HeaderX** to enable it, and grant it access to web pages when prompted.
+5. The **H** icon appears in the Safari toolbar. If it's hidden, right-click the toolbar → **Customize Toolbar…** and drag it into place.
+
+> **If HeaderX doesn't appear or looks greyed out**, the build may be unsigned. Enable Safari's developer features under **Safari → Settings → Advanced → "Show features for web developers"**, then turn on **Develop → Allow Unsigned Extensions**. Note that this setting resets each time Safari restarts.
+
+### Updating
+
+Download the newer `HeaderX.dmg` from the Releases page and replace the copy in **Applications** (quit Safari first). Your saved headers and profiles are stored by Safari and carry over across updates.
 
 ## Usage
 
@@ -76,21 +85,38 @@ Save the current JSON as a named set and reuse it later:
 ## File Structure
 
 ```
-headerx/
+headerx-safari/
 ├── manifest.json      # Extension configuration (MV3)
 ├── background.js      # Service worker that applies rules
 ├── popup.html         # Popup UI
 ├── popup.js           # Popup UI logic
+├── content.js         # Content script (relays headers to the page)
+├── page.js            # In-page injection for non-standard headers
 ├── icons/             # Extension icons
+├── HeaderX/           # Native macOS/iOS app wrapper (Xcode project)
 └── README.md          # This file
 ```
 
 ## How It Works
 
 1. The popup parses your JSON and sends it to the background service worker
-2. The service worker stores it in `chrome.storage.local` and uses Chrome's **declarativeNetRequest API** to register a header-injection rule
-3. The toggle simply adds or removes the rule — headers and profiles stay saved either way
-4. Rules are restored on browser startup
+2. The service worker stores it in `browser.storage.local` and uses Safari's **declarativeNetRequest API** to register a header-injection rule
+3. Safari's `declarativeNetRequest` only accepts **standard** header names. Any header it rejects is instead injected in-page via `content.js` / `page.js`, which patches `fetch`/`XHR` (so those headers reach `fetch`/`XHR` requests only, not top-level navigations)
+4. The toggle simply adds or removes the rules — headers and profiles stay saved either way
+5. Rules are restored on browser startup
+
+```mermaid
+flowchart TD
+    U([User edits JSON<br/>and clicks Save &amp; Apply]) --> P[popup.js<br/>parses headers]
+    P -->|"runtime.sendMessage<br/>{ action: updateRules }"| B[background.js<br/>service worker]
+    B --> S[(browser.storage.local<br/>headers · enabled · profiles)]
+    B --> Q{Header name<br/>standard?}
+    Q -->|Yes| DNR[declarativeNetRequest rule]
+    Q -->|"No (rejected by Safari)"| C[content.js]
+    C --> PG[page.js patches<br/>fetch / XHR]
+    DNR --> R1([main_frame · sub_frame<br/>xmlhttprequest · ping])
+    PG --> R2([fetch / XHR requests only])
+```
 
 ### Message Format (popup → background)
 
@@ -108,14 +134,16 @@ headerx/
 ## Limitations
 
 - Headers apply to **all URLs** while enabled — be careful with sensitive headers like `Authorization`, since they'll be sent to every site you visit
-- Headers are applied to main frames, subframes, XHR, and ping requests
+- **Standard** header names are applied to main frames, subframes, XHR, and ping requests via `declarativeNetRequest`
+- **Non-standard** header names (which Safari's `declarativeNetRequest` rejects) are injected in-page and therefore reach `fetch`/`XHR` requests only — not top-level page navigations
 
 ## Troubleshooting
 
 **Headers not being applied:**
 - Check that the toggle in the top-right corner is turned **on**
 - Make sure you clicked **Save & Apply** after editing the JSON
-- Verify the extension is enabled in your browser settings
+- Verify HeaderX is enabled under **Safari → Settings → Extensions**
+- If the build is unsigned, confirm **Develop → Allow Unsigned Extensions** is still on (it resets when Safari restarts)
 
 **Invalid JSON errors:**
 - The textarea must contain a JSON array of `{"name": ..., "value": ...}` objects or a plain `{"Header": "value"}` map
@@ -123,10 +151,12 @@ headerx/
 
 ## Development
 
-To modify the extension:
+Safari loads the extension from the native app bundle, so changes are picked up by rebuilding in Xcode:
 
-1. Edit `popup.html`, `popup.js`, or `background.js`
-2. Reload the extension from `chrome://extensions/`
+1. Open `HeaderX/HeaderX.xcodeproj` in Xcode
+2. Edit the extension resources (`popup.html`, `popup.js`, `background.js`, `content.js`, `page.js`)
+3. Build & run the **HeaderX** app target (⌘R) to reinstall the extension
+4. In Safari, enable **Develop → Allow Unsigned Extensions** (resets each restart), then toggle HeaderX off/on under **Settings → Extensions** to load the new build
 
 ## License
 
