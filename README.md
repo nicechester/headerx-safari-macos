@@ -1,8 +1,8 @@
 # HeaderX for Safari
 
-A lightweight Safari extension for macOS that injects custom HTTP headers into web requests. Perfect for local development, testing APIs, and adding authentication tokens on the fly.
+A lightweight Safari extension for **macOS and iOS (iPhone/iPad)** that injects custom HTTP headers into web requests. Perfect for local development, testing APIs, and adding authentication tokens on the fly.
 
-Safari ships web extensions inside a native macOS app, so HeaderX is distributed as a signed `.dmg` rather than an unpacked folder.
+Safari ships web extensions inside a native app, so HeaderX is distributed as a signed macOS `.dmg` (and builds to iPhone/iPad from the same Xcode project) rather than an unpacked folder.
 
 > Looking for Chrome? Chromium-based browsers are supported by a separate build — see **[nicechester/headerx](https://github.com/nicechester/headerx)**. (Safari's `declarativeNetRequest` only accepts standard header names, which is why it's a separate project.)
 
@@ -18,6 +18,8 @@ Safari ships web extensions inside a native macOS app, so HeaderX is distributed
 
 ## Installation
 
+### macOS
+
 Download the latest `HeaderX.dmg` from the **[Releases page](https://github.com/nicechester/headerx-safari-macos/releases)**, then:
 
 1. Open the downloaded `HeaderX.dmg` and drag **HeaderX.app** into your **Applications** folder.
@@ -28,13 +30,24 @@ Download the latest `HeaderX.dmg` from the **[Releases page](https://github.com/
 
 > **If HeaderX doesn't appear or looks greyed out**, the build may be unsigned. Enable Safari's developer features under **Safari → Settings → Advanced → "Show features for web developers"**, then turn on **Develop → Allow Unsigned Extensions**. Note that this setting resets each time Safari restarts.
 
+### iOS (iPhone/iPad)
+
+The iOS app is built to your device from the shared Xcode project (see [Development](#development)):
+
+1. Open `HeaderX/HeaderX.xcodeproj` in Xcode, select the **iOS** app target, and run it on a connected iPhone/iPad (or Simulator).
+2. On the device, open **Settings → Apps → Safari → Extensions** (older iOS: **Settings → Safari → Extensions**) and turn **HeaderX** on.
+3. Set its permissions to **Allow** for the sites you want (or **All Websites**).
+4. In Safari, tap the **puzzle-piece / “aA”** menu in the address bar → **HeaderX** to open the popup and edit headers.
+
+> A device build installed from Xcode is signed with a development profile that expires after 7 days (free Apple ID) — rebuild from Xcode when it lapses. A paid Apple Developer account extends this.
+
 ### Updating
 
 Download the newer `HeaderX.dmg` from the Releases page and replace the copy in **Applications** (quit Safari first). Your saved headers and profiles are stored by Safari and carry over across updates.
 
 ## Usage
 
-1. Click the **HeaderX** icon in your browser toolbar
+1. Open the **HeaderX** popup — click the toolbar icon on macOS, or tap the address-bar **puzzle-piece / “aA”** menu → **HeaderX** on iOS
 2. Enter your headers as JSON in the textarea. Two formats are accepted:
 
    ```json
