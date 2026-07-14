@@ -4,7 +4,7 @@ A lightweight Safari extension for macOS that injects custom HTTP headers into w
 
 Safari ships web extensions inside a native macOS app, so HeaderX is distributed as a signed `.dmg` rather than an unpacked folder.
 
-> Looking for Chrome? Chromium-based browsers are supported by a separate build, since Safari's `declarativeNetRequest` only accepts standard header names.
+> Looking for Chrome? Chromium-based browsers are supported by a separate build — see **[nicechester/headerx](https://github.com/nicechester/headerx)**. (Safari's `declarativeNetRequest` only accepts standard header names, which is why it's a separate project.)
 
 ## Features
 
