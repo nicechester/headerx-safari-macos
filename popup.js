@@ -14,6 +14,7 @@ const deleteProfileBtn = document.getElementById("deleteProfileBtn");
 let headers = [];   // [{ name, value, enabled }]
 let profiles = {};
 let viewMode = "json";
+let editingIndex = null;
 
 async function loadState() {
   const state = await browser.storage.local.get(["headers", "enabled", "profiles", "viewMode"]);
@@ -47,6 +48,7 @@ function setView(mode) {
 
 viewJsonBtn.addEventListener("click", () => {
   if (viewMode === "json") return;
+  editingIndex = null;
   jsonBox.value = headers.length > 0 ? serializeHeaders(headers) : "";
   setView("json");
 });
@@ -75,7 +77,8 @@ function renderList() {
 
   headers.forEach((header, index) => {
     const row = document.createElement("div");
-    row.className = "header-row" + (header.enabled ? "" : " off");
+    const isEditing = index === editingIndex;
+    row.className = "header-row" + (header.enabled ? "" : " off") + (isEditing ? " editing" : "");
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -89,24 +92,109 @@ function renderList() {
       });
     });
 
-    const info = document.createElement("div");
-    info.className = "header-row-info";
-
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "header-row-name";
-    nameDiv.textContent = header.name;
-
-    const valueDiv = document.createElement("div");
-    valueDiv.className = "header-row-value";
-    valueDiv.textContent = header.value;
-    valueDiv.title = header.value;
-
-    info.appendChild(nameDiv);
-    info.appendChild(valueDiv);
     row.appendChild(checkbox);
-    row.appendChild(info);
-    headerList.appendChild(row);
+
+    if (isEditing) {
+      const edit = document.createElement("div");
+      edit.className = "header-row-edit";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "edit-name";
+      nameInput.value = header.name;
+
+      const valueInput = document.createElement("input");
+      valueInput.type = "text";
+      valueInput.className = "edit-value";
+      valueInput.value = header.value;
+
+      const handleKeydown = (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          saveEdit(index, nameInput, valueInput);
+        } else if (event.key === "Escape") {
+          editingIndex = null;
+          renderList();
+        }
+      };
+      nameInput.addEventListener("keydown", handleKeydown);
+      valueInput.addEventListener("keydown", handleKeydown);
+
+      edit.appendChild(nameInput);
+      edit.appendChild(valueInput);
+      row.appendChild(edit);
+
+      const saveButton = document.createElement("button");
+      saveButton.className = "row-btn save";
+      saveButton.textContent = "Save";
+      saveButton.addEventListener("click", () => saveEdit(index, nameInput, valueInput));
+
+      const cancelButton = document.createElement("button");
+      cancelButton.className = "row-btn cancel";
+      cancelButton.textContent = "Cancel";
+      cancelButton.addEventListener("click", () => {
+        editingIndex = null;
+        renderList();
+      });
+
+      row.appendChild(saveButton);
+      row.appendChild(cancelButton);
+      headerList.appendChild(row);
+
+      nameInput.focus();
+      nameInput.select();
+    } else {
+      const info = document.createElement("div");
+      info.className = "header-row-info";
+
+      const nameDiv = document.createElement("div");
+      nameDiv.className = "header-row-name";
+      nameDiv.textContent = header.name;
+
+      const valueDiv = document.createElement("div");
+      valueDiv.className = "header-row-value";
+      valueDiv.textContent = header.value;
+      valueDiv.title = header.value;
+
+      info.appendChild(nameDiv);
+      info.appendChild(valueDiv);
+      row.appendChild(info);
+
+      const editButton = document.createElement("button");
+      editButton.className = "row-btn edit";
+      editButton.textContent = "Edit";
+      editButton.addEventListener("click", () => {
+        editingIndex = index;
+        renderList();
+      });
+      row.appendChild(editButton);
+
+      headerList.appendChild(row);
+    }
   });
+}
+
+function saveEdit(index, nameInput, valueInput) {
+  const name = nameInput.value.trim();
+
+  if (!name) {
+    showStatus("Header name can't be empty", "error");
+    nameInput.focus();
+    return;
+  }
+
+  const isDuplicate = headers.some(
+    (h, i) => i !== index && h.name.toLowerCase() === name.toLowerCase()
+  );
+  if (isDuplicate) {
+    showStatus(`"${name}" already exists`, "error");
+    return;
+  }
+
+  headers[index] = { ...headers[index], name, value: valueInput.value };
+  editingIndex = null;
+  renderList();
+  applyCurrent(() => showStatus(`"${name}" updated`, "success"));
 }
 
 // --- Parsing / serializing ---
