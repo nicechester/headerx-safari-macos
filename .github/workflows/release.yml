@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Sync manifest version to tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          tmp="$(mktemp)"
+          jq --arg v "$VERSION" '.version = $v' manifest.json > "$tmp"
+          mv "$tmp" manifest.json
+          echo "manifest.json version set to $VERSION"
+
+      - name: Sync Xcode project version to tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i '' -E "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = ${VERSION};/g" \
+            HeaderX/HeaderX.xcodeproj/project.pbxproj
+          echo "MARKETING_VERSION set to $VERSION"
+
+      - name: Build release DMG
+        run: |
+          DMG="HeaderX-macos-v${{ steps.version.outputs.version }}.dmg"
+          ./make-dmg.sh "$DMG" \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            CODE_SIGNING_REQUIRED=YES
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "$DMG" \
+            --title "HeaderX ${{ steps.version.outputs.version }}" \
+            --notes "This app is not notarized. On first launch, right-click the app and choose Open, and enable Safari > Settings > Developer > Allow Unsigned Extensions." \
+            --generate-notes

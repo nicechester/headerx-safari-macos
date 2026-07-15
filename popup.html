@@ -173,6 +173,53 @@
       opacity: 0.4;
     }
 
+    .row-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .row-btn.edit {
+      background: #3498db;
+    }
+
+    .row-btn.edit:hover {
+      background: #2980b9;
+    }
+
+    .row-btn.save {
+      background: #27ae60;
+    }
+
+    .row-btn.save:hover {
+      background: #229954;
+    }
+
+    .row-btn.cancel {
+      background: #7f8c8d;
+    }
+
+    .row-btn.cancel:hover {
+      background: #6c7a7f;
+    }
+
+    .header-row.editing {
+      align-items: flex-start;
+    }
+
+    .header-row-edit {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .header-row-edit input {
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
     .empty-list {
       padding: 12px;
       color: #999;
