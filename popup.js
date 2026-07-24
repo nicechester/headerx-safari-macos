@@ -82,7 +82,7 @@ const PLUS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13H1
 function createRemoveButton(index) {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
-  removeButton.className = "icon-btn remove row-icon-btn";
+  removeButton.className = "icon-btn delete row-icon-btn";
   removeButton.title = "Remove header";
   removeButton.setAttribute("aria-label", "Remove header");
   removeButton.innerHTML = TRASH_ICON;
