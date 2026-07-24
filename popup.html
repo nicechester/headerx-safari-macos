@@ -362,16 +362,11 @@ or
 
     <label>Profiles:</label>
     <div class="row">
-      <select id="profileSelect">
-        <option value="">— saved profiles —</option>
-      </select>
+      <input type="text" id="profileCombo" list="profileOptions" placeholder="Profile name" autocomplete="off">
       <button class="secondary" id="loadProfileBtn">Load</button>
       <button class="delete" id="deleteProfileBtn">Delete</button>
     </div>
-    <div class="row">
-      <input type="text" id="profileName" placeholder="Profile name">
-      <button class="secondary" id="saveProfileBtn">Save Profile</button>
-    </div>
+    <datalist id="profileOptions"></datalist>
   </div>
 
   <script src="popup.js"></script>
