@@ -52,7 +52,7 @@ function setView(mode) {
   if (mode === "list") {
     renderList();
   }
-  chrome.storage.local.set({ viewMode: mode });
+  browser.storage.local.set({ viewMode: mode }).catch(() => {});
 }
 
 viewJsonBtn.addEventListener("click", () => {
@@ -606,4 +606,6 @@ function showStatus(message, type) {
   }, 3000);
 }
 
-loadState();
+loadState().catch((err) => {
+  showStatus(`Failed to load saved state: ${err.message}`, "error");
+});

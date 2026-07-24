@@ -15,7 +15,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        return true
+        // Keep the host app alive so Safari can reach the web extension after the
+        // setup window is dismissed (especially important for Xcode/dev builds).
+        return false
     }
 
 }
