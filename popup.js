@@ -76,11 +76,54 @@ viewListBtn.addEventListener("click", () => {
 
 // --- List view ---
 
+function appendAddHeaderButton() {
+  const addRow = document.createElement("div");
+  addRow.className = "list-add-row";
+
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "list-add-btn";
+  addButton.textContent = "+ Add header";
+  addButton.addEventListener("click", () => {
+    if (editingIndex !== null) {
+      showStatus("Finish or cancel the current edit first", "error");
+      return;
+    }
+    headers.push({ name: "", value: "", enabled: true });
+    editingIndex = headers.length - 1;
+    renderList();
+  });
+
+  addRow.appendChild(addButton);
+  headerList.appendChild(addRow);
+}
+
+function removeHeader(index) {
+  const header = headers[index];
+  const label = header.name || "this header";
+  if (!confirm(`Remove header "${label}"?`)) {
+    return;
+  }
+
+  headers.splice(index, 1);
+  if (editingIndex === index) {
+    editingIndex = null;
+  } else if (editingIndex !== null && editingIndex > index) {
+    editingIndex -= 1;
+  }
+  renderList();
+  applyCurrent(() => showStatus(`"${label}" removed`, "success"));
+}
+
 function renderList() {
   headerList.innerHTML = "";
 
-  if (headers.length === 0) {
-    headerList.innerHTML = '<div class="empty-list">No headers — add them in the JSON view</div>';
+  if (headers.length === 0 && editingIndex === null) {
+    const empty = document.createElement("div");
+    empty.className = "empty-list";
+    empty.textContent = "No headers yet.";
+    headerList.appendChild(empty);
+    appendAddHeaderButton();
     return;
   }
 
@@ -142,6 +185,9 @@ function renderList() {
       cancelButton.className = "row-btn cancel";
       cancelButton.textContent = "Cancel";
       cancelButton.addEventListener("click", () => {
+        if (!header.name && !header.value) {
+          headers.splice(index, 1);
+        }
         editingIndex = null;
         renderList();
       });
@@ -178,9 +224,19 @@ function renderList() {
       });
       row.appendChild(editButton);
 
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "row-btn remove";
+      removeButton.textContent = "Remove";
+      removeButton.title = "Remove header";
+      removeButton.addEventListener("click", () => removeHeader(index));
+      row.appendChild(removeButton);
+
       headerList.appendChild(row);
     }
   });
+
+  appendAddHeaderButton();
 }
 
 function saveEdit(index, nameInput, valueInput) {
