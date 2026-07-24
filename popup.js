@@ -76,24 +76,80 @@ viewListBtn.addEventListener("click", () => {
 
 // --- List view ---
 
-function appendAddHeaderButton() {
+const TRASH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+const PLUS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
+
+function createRemoveButton(index) {
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.className = "icon-btn remove row-icon-btn";
+  removeButton.title = "Remove header";
+  removeButton.setAttribute("aria-label", "Remove header");
+  removeButton.innerHTML = TRASH_ICON;
+  removeButton.addEventListener("click", () => removeHeader(index));
+  return removeButton;
+}
+
+function appendAddHeaderRow() {
   const addRow = document.createElement("div");
   addRow.className = "list-add-row";
 
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.className = "add-name";
+  nameInput.placeholder = "Header name";
+
+  const valueInput = document.createElement("input");
+  valueInput.type = "text";
+  valueInput.className = "add-value";
+  valueInput.placeholder = "Value";
+
   const addButton = document.createElement("button");
   addButton.type = "button";
-  addButton.className = "list-add-btn";
-  addButton.textContent = "+ Add header";
-  addButton.addEventListener("click", () => {
-    if (editingIndex !== null) {
-      showStatus("Finish or cancel the current edit first", "error");
+  addButton.className = "icon-btn secondary list-add-icon";
+  addButton.title = "Add header";
+  addButton.setAttribute("aria-label", "Add header");
+  addButton.innerHTML = PLUS_ICON;
+
+  const submitAdd = () => {
+    const name = nameInput.value.trim();
+    const value = valueInput.value;
+
+    if (!name) {
+      showStatus("Header name can't be empty", "error");
+      nameInput.focus();
       return;
     }
-    headers.push({ name: "", value: "", enabled: true });
-    editingIndex = headers.length - 1;
+
+    if (headers.some(h => h.name.toLowerCase() === name.toLowerCase())) {
+      showStatus(`"${name}" already exists`, "error");
+      nameInput.focus();
+      return;
+    }
+
+    headers.push({ name, value, enabled: true });
+    nameInput.value = "";
+    valueInput.value = "";
     renderList();
+    applyCurrent(() => showStatus(`"${name}" added`, "success"));
+  };
+
+  addButton.addEventListener("click", submitAdd);
+  nameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      valueInput.focus();
+    }
+  });
+  valueInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitAdd();
+    }
   });
 
+  addRow.appendChild(nameInput);
+  addRow.appendChild(valueInput);
   addRow.appendChild(addButton);
   headerList.appendChild(addRow);
 }
@@ -123,8 +179,6 @@ function renderList() {
     empty.className = "empty-list";
     empty.textContent = "No headers yet.";
     headerList.appendChild(empty);
-    appendAddHeaderButton();
-    return;
   }
 
   headers.forEach((header, index) => {
@@ -185,9 +239,6 @@ function renderList() {
       cancelButton.className = "row-btn cancel";
       cancelButton.textContent = "Cancel";
       cancelButton.addEventListener("click", () => {
-        if (!header.name && !header.value) {
-          headers.splice(index, 1);
-        }
         editingIndex = null;
         renderList();
       });
@@ -223,20 +274,13 @@ function renderList() {
         renderList();
       });
       row.appendChild(editButton);
-
-      const removeButton = document.createElement("button");
-      removeButton.type = "button";
-      removeButton.className = "row-btn remove";
-      removeButton.textContent = "Remove";
-      removeButton.title = "Remove header";
-      removeButton.addEventListener("click", () => removeHeader(index));
-      row.appendChild(removeButton);
+      row.appendChild(createRemoveButton(index));
 
       headerList.appendChild(row);
     }
   });
 
-  appendAddHeaderButton();
+  appendAddHeaderRow();
 }
 
 function saveEdit(index, nameInput, valueInput) {

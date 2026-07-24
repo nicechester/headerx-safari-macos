@@ -205,28 +205,49 @@
 
     .row-btn.remove {
       background: #e74c3c;
-      padding: 4px 8px;
     }
 
     .row-btn.remove:hover {
       background: #c0392b;
     }
 
+    button.row-icon-btn {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    button.row-icon-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
     .list-add-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       padding: 10px 12px;
       border-top: 1px solid #eee;
       background: #fafafa;
     }
 
-    .list-add-btn {
-      width: 100%;
-      padding: 8px 12px;
+    .list-add-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
       font-size: 12px;
-      background: #3498db;
+      border: 1px solid #ddd;
+      border-radius: 4px;
     }
 
-    .list-add-btn:hover {
-      background: #2980b9;
+    .list-add-icon {
+      width: 32px;
+      height: 32px;
     }
 
     .header-row.editing {
