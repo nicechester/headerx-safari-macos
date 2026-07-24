@@ -83,7 +83,7 @@ const EDIT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25
 function createEditButton(index) {
   const editButton = document.createElement("button");
   editButton.type = "button";
-  editButton.className = "icon-btn secondary row-icon-btn";
+  editButton.className = "icon-btn icon-edit row-icon-btn";
   editButton.title = "Edit header";
   editButton.setAttribute("aria-label", "Edit header");
   editButton.innerHTML = EDIT_ICON;
@@ -97,7 +97,7 @@ function createEditButton(index) {
 function createRemoveButton(index) {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
-  removeButton.className = "icon-btn delete row-icon-btn";
+  removeButton.className = "icon-btn icon-delete row-icon-btn";
   removeButton.title = "Remove header";
   removeButton.setAttribute("aria-label", "Remove header");
   removeButton.innerHTML = TRASH_ICON;
@@ -121,7 +121,7 @@ function appendAddHeaderRow() {
 
   const addButton = document.createElement("button");
   addButton.type = "button";
-  addButton.className = "icon-btn secondary list-add-icon";
+  addButton.className = "icon-btn icon-add list-add-icon";
   addButton.title = "Add header";
   addButton.setAttribute("aria-label", "Add header");
   addButton.innerHTML = PLUS_ICON;
