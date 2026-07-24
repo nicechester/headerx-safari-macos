@@ -284,6 +284,22 @@
       background: #c0392b;
     }
 
+    button.icon-btn {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    button.icon-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
     .row {
       display: flex;
       gap: 8px;
@@ -356,15 +372,19 @@ or
 
     <div class="header-list" id="headerList" style="display: none;"></div>
 
-    <button class="primary" id="saveBtn">Save & Apply</button>
+    <button class="primary" id="applyBtn">Apply</button>
 
     <div class="divider"></div>
 
     <label>Profiles:</label>
     <div class="row">
       <input type="text" id="profileCombo" list="profileOptions" placeholder="Profile name" autocomplete="off">
-      <button class="secondary" id="loadProfileBtn">Load</button>
-      <button class="delete" id="deleteProfileBtn">Delete</button>
+      <button type="button" class="icon-btn secondary" id="saveProfileBtn" title="Save profile" aria-label="Save profile">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/></svg>
+      </button>
+      <button type="button" class="icon-btn delete" id="deleteProfileBtn" title="Delete profile" aria-label="Delete profile">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+      </button>
     </div>
     <datalist id="profileOptions"></datalist>
   </div>
