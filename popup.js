@@ -459,6 +459,11 @@ deleteProfileBtn.addEventListener("click", async () => {
     return;
   }
 
+  const confirmed = confirm(`Delete profile "${name}"? This cannot be undone.`);
+  if (!confirmed) {
+    return;
+  }
+
   delete profiles[name];
   if (activeProfile === name) {
     activeProfile = "";
