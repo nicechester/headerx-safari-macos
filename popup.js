@@ -2,12 +2,12 @@ const jsonBox = document.getElementById("jsonBox");
 const headerList = document.getElementById("headerList");
 const viewJsonBtn = document.getElementById("viewJsonBtn");
 const viewListBtn = document.getElementById("viewListBtn");
-const saveBtn = document.getElementById("saveBtn");
+const applyBtn = document.getElementById("applyBtn");
 const enabledToggle = document.getElementById("enabledToggle");
 const statusDiv = document.getElementById("status");
 const profileCombo = document.getElementById("profileCombo");
 const profileOptions = document.getElementById("profileOptions");
-const loadProfileBtn = document.getElementById("loadProfileBtn");
+const saveProfileBtn = document.getElementById("saveProfileBtn");
 const deleteProfileBtn = document.getElementById("deleteProfileBtn");
 
 let headers = [];   // [{ name, value, enabled }]
@@ -15,6 +15,7 @@ let profiles = {};
 let activeProfile = "";
 let viewMode = "json";
 let editingIndex = null;
+let suppressProfileChange = false;
 
 async function loadState() {
   const state = await browser.storage.local.get([
@@ -29,7 +30,7 @@ async function loadState() {
   activeProfile = state.activeProfile || "";
   enabledToggle.checked = state.enabled || false;
   jsonBox.value = headers.length > 0 ? serializeHeaders(headers) : "";
-  profileCombo.value = activeProfile;
+  setProfileComboValue(activeProfile);
   renderProfiles();
   setView(state.viewMode || "json");
 }
@@ -46,7 +47,7 @@ function setView(mode) {
   viewJsonBtn.classList.toggle("active", mode === "json");
   viewListBtn.classList.toggle("active", mode === "list");
   jsonBox.style.display = mode === "json" ? "" : "none";
-  saveBtn.style.display = mode === "json" ? "" : "none";
+  applyBtn.style.display = mode === "json" ? "" : "none";
   headerList.style.display = mode === "list" ? "" : "none";
   if (mode === "list") {
     renderList();
@@ -272,9 +273,36 @@ function serializeHeaders(list) {
 
 // --- Apply ---
 
-function profilePrefix() {
-  const name = profileCombo.value.trim();
-  return name ? `Profile "${name}" saved — ` : "";
+function currentHeaders() {
+  if (viewMode === "json") {
+    return parseHeaders(jsonBox.value);
+  }
+  return headers;
+}
+
+function headersEqual(a, b) {
+  const left = normalizeHeaders(a);
+  const right = normalizeHeaders(b);
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((header, index) => {
+    const other = right[index];
+    return header.name === other.name &&
+      header.value === other.value &&
+      header.enabled === other.enabled;
+  });
+}
+
+function hasUnsavedProfileChanges() {
+  if (!activeProfile || !profiles[activeProfile]) {
+    return false;
+  }
+  try {
+    return !headersEqual(currentHeaders(), profiles[activeProfile].headers);
+  } catch {
+    return true;
+  }
 }
 
 async function saveToActiveProfile(toSave) {
@@ -287,13 +315,11 @@ async function saveToActiveProfile(toSave) {
   activeProfile = name;
   await browser.storage.local.set({ profiles, activeProfile: name });
   renderProfiles();
-  profileCombo.value = name;
+  setProfileComboValue(name);
   return name;
 }
 
-function applyCurrent(onSuccess, options = {}) {
-  const { skipProfileSave = false } = options;
-
+function applyCurrent(onSuccess) {
   browser.runtime.sendMessage(
     { action: "updateRules", headers, enabled: enabledToggle.checked },
     (response) => {
@@ -302,32 +328,21 @@ function applyCurrent(onSuccess, options = {}) {
         return;
       }
 
-      (async () => {
-        if (!skipProfileSave) {
-          try {
-            await saveToActiveProfile(headers);
-          } catch (err) {
-            showStatus(`Rules applied but profile save failed: ${err.message}`, "error");
-            return;
-          }
-        }
+      if (response.skipped && response.skipped.length > 0) {
+        showStatus(
+          `${response.applied} header(s) via network rules; ` +
+          `${response.skipped.join(", ")} via in-page injection (fetch/XHR only)`,
+          "success"
+        );
+        return;
+      }
 
-        if (response.skipped && response.skipped.length > 0) {
-          showStatus(
-            `${profilePrefix()}${response.applied} header(s) via network rules; ` +
-            `${response.skipped.join(", ")} via in-page injection (fetch/XHR only)`,
-            "success"
-          );
-          return;
-        }
-
-        onSuccess(response);
-      })();
+      onSuccess(response);
     }
   );
 }
 
-saveBtn.addEventListener("click", () => {
+applyBtn.addEventListener("click", () => {
   try {
     headers = parseHeaders(jsonBox.value);
   } catch (err) {
@@ -339,8 +354,8 @@ saveBtn.addEventListener("click", () => {
   applyCurrent(() => {
     showStatus(
       enabledToggle.checked
-        ? `${profilePrefix()}${active} header(s) active on all URLs`
-        : `${profilePrefix()}Saved ${headers.length} header(s) — turn the toggle on to activate`,
+        ? `${active} header(s) active on all URLs`
+        : `${headers.length} header(s) ready — turn the toggle on to activate`,
       "success"
     );
   });
@@ -360,17 +375,17 @@ enabledToggle.addEventListener("change", () => {
 
 // --- Profiles ---
 
-loadProfileBtn.addEventListener("click", async () => {
-  const name = profileCombo.value.trim();
+function setProfileComboValue(name) {
+  suppressProfileChange = true;
+  profileCombo.value = name;
+  suppressProfileChange = false;
+}
 
-  if (!name || !profiles[name]) {
-    showStatus("Select or enter a saved profile to load", "error");
-    return;
-  }
-
+async function loadProfile(name) {
   activeProfile = name;
   headers = normalizeHeaders(profiles[name].headers);
   jsonBox.value = serializeHeaders(headers);
+  setProfileComboValue(name);
   try {
     await browser.storage.local.set({ activeProfile: name });
   } catch (err) {
@@ -381,7 +396,59 @@ loadProfileBtn.addEventListener("click", async () => {
   }
   applyCurrent(() => {
     showStatus(`Profile "${name}" loaded and applied`, "success");
-  }, { skipProfileSave: true });
+  });
+}
+
+async function trySwitchProfile(name) {
+  if (suppressProfileChange || !name || name === activeProfile || !profiles[name]) {
+    return;
+  }
+
+  if (hasUnsavedProfileChanges()) {
+    const confirmed = confirm(
+      `You have unsaved changes to profile "${activeProfile}". ` +
+      `Switch to "${name}" anyway? Unsaved changes will be lost.`
+    );
+    if (!confirmed) {
+      setProfileComboValue(activeProfile);
+      return;
+    }
+  }
+
+  await loadProfile(name);
+}
+
+profileCombo.addEventListener("change", () => {
+  trySwitchProfile(profileCombo.value.trim());
+});
+
+profileCombo.addEventListener("blur", () => {
+  trySwitchProfile(profileCombo.value.trim());
+});
+
+saveProfileBtn.addEventListener("click", async () => {
+  const name = profileCombo.value.trim();
+  if (!name) {
+    showStatus("Enter a profile name to save", "error");
+    profileCombo.focus();
+    return;
+  }
+
+  let toSave;
+  try {
+    toSave = currentHeaders();
+    headers = toSave;
+  } catch (err) {
+    showStatus(`Invalid JSON: ${err.message}`, "error");
+    return;
+  }
+
+  try {
+    await saveToActiveProfile(toSave);
+    showStatus(`Profile "${name}" saved`, "success");
+  } catch (err) {
+    showStatus(`Profile save failed: ${err.message}`, "error");
+  }
 });
 
 deleteProfileBtn.addEventListener("click", async () => {
@@ -395,7 +462,7 @@ deleteProfileBtn.addEventListener("click", async () => {
   delete profiles[name];
   if (activeProfile === name) {
     activeProfile = "";
-    profileCombo.value = "";
+    setProfileComboValue("");
   }
   try {
     await browser.storage.local.set({ profiles, activeProfile });
