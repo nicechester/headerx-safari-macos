@@ -78,6 +78,21 @@ viewListBtn.addEventListener("click", () => {
 
 const TRASH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
 const PLUS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
+const EDIT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
+
+function createEditButton(index) {
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.className = "icon-btn secondary row-icon-btn";
+  editButton.title = "Edit header";
+  editButton.setAttribute("aria-label", "Edit header");
+  editButton.innerHTML = EDIT_ICON;
+  editButton.addEventListener("click", () => {
+    editingIndex = index;
+    renderList();
+  });
+  return editButton;
+}
 
 function createRemoveButton(index) {
   const removeButton = document.createElement("button");
@@ -266,14 +281,7 @@ function renderList() {
       info.appendChild(valueDiv);
       row.appendChild(info);
 
-      const editButton = document.createElement("button");
-      editButton.className = "row-btn edit";
-      editButton.textContent = "Edit";
-      editButton.addEventListener("click", () => {
-        editingIndex = index;
-        renderList();
-      });
-      row.appendChild(editButton);
+      row.appendChild(createEditButton(index));
       row.appendChild(createRemoveButton(index));
 
       headerList.appendChild(row);
