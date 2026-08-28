@@ -16,6 +16,8 @@ let activeProfile = "";
 let viewMode = "json";
 let editingIndex = null;
 let suppressProfileChange = false;
+let confirmOpen = false;
+let profileSwitchPending = false;
 
 async function loadState() {
   const state = await browser.storage.local.get([
@@ -73,6 +75,79 @@ viewListBtn.addEventListener("click", () => {
   }
   setView("list");
 });
+
+// --- Confirmation dialog ---
+
+// Safari's extension popover ignores window.confirm() and returns false, which
+// silently cancels every destructive action. Ask in the popup itself instead.
+function requestConfirm({ message, confirmLabel = "OK", confirmClass = "delete" }) {
+  if (confirmOpen) {
+    return Promise.resolve(false);
+  }
+  confirmOpen = true;
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "confirm-dialog";
+    dialog.setAttribute("role", "alertdialog");
+    dialog.setAttribute("aria-modal", "true");
+
+    const text = document.createElement("div");
+    text.className = "confirm-message";
+    text.textContent = message;
+
+    const actions = document.createElement("div");
+    actions.className = "confirm-actions";
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "cancel";
+    cancelButton.textContent = "Cancel";
+
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = confirmClass;
+    confirmButton.textContent = confirmLabel;
+
+    const close = (result) => {
+      document.removeEventListener("keydown", onKeydown, true);
+      overlay.remove();
+      confirmOpen = false;
+      resolve(result);
+    };
+
+    const onKeydown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close(false);
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        close(true);
+      }
+    };
+
+    cancelButton.addEventListener("click", () => close(false));
+    confirmButton.addEventListener("click", () => close(true));
+    overlay.addEventListener("mousedown", (event) => {
+      if (event.target === overlay) {
+        close(false);
+      }
+    });
+    document.addEventListener("keydown", onKeydown, true);
+
+    actions.appendChild(cancelButton);
+    actions.appendChild(confirmButton);
+    dialog.appendChild(text);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    confirmButton.focus();
+  });
+}
 
 // --- List view ---
 
@@ -146,7 +221,10 @@ function appendAddHeaderRow() {
     nameInput.value = "";
     valueInput.value = "";
     renderList();
-    applyCurrent(() => showStatus(`"${name}" added`, "success"));
+    applyCurrent(() => {
+      browser.storage.local.set({ headers }).catch(() => {});
+      showStatus(`"${name}" added`, "success");
+    });
   };
 
   addButton.addEventListener("click", submitAdd);
@@ -169,10 +247,14 @@ function appendAddHeaderRow() {
   headerList.appendChild(addRow);
 }
 
-function removeHeader(index) {
+async function removeHeader(index) {
   const header = headers[index];
   const label = header.name || "this header";
-  if (!confirm(`Remove header "${label}"?`)) {
+  const confirmed = await requestConfirm({
+    message: `Remove header "${label}"?`,
+    confirmLabel: "Remove"
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -183,7 +265,10 @@ function removeHeader(index) {
     editingIndex -= 1;
   }
   renderList();
-  applyCurrent(() => showStatus(`"${label}" removed`, "success"));
+  applyCurrent(() => {
+    browser.storage.local.set({ headers }).catch(() => {});
+    showStatus(`"${label}" removed`, "success");
+  });
 }
 
 function renderList() {
@@ -209,6 +294,7 @@ function renderList() {
       headers[index].enabled = checkbox.checked;
       row.classList.toggle("off", !checkbox.checked);
       applyCurrent(() => {
+        browser.storage.local.set({ headers }).catch(() => {});
         showStatus(`"${header.name}" turned ${checkbox.checked ? "on" : "off"}`, "success");
       });
     });
@@ -311,7 +397,10 @@ function saveEdit(index, nameInput, valueInput) {
   headers[index] = { ...headers[index], name, value: valueInput.value };
   editingIndex = null;
   renderList();
-  applyCurrent(() => showStatus(`"${name}" updated`, "success"));
+  applyCurrent(() => {
+    browser.storage.local.set({ headers }).catch(() => {});
+    showStatus(`"${name}" updated`, "success");
+  });
 }
 
 // --- Parsing / serializing ---
@@ -508,15 +597,31 @@ async function loadProfile(name) {
 }
 
 async function trySwitchProfile(name) {
-  if (suppressProfileChange || !name || name === activeProfile || !profiles[name]) {
+  if (
+    profileSwitchPending ||
+    suppressProfileChange ||
+    !name ||
+    name === activeProfile ||
+    !profiles[name]
+  ) {
     return;
   }
 
   if (hasUnsavedProfileChanges()) {
-    const confirmed = confirm(
-      `You have unsaved changes to profile "${activeProfile}". ` +
-      `Switch to "${name}" anyway? Unsaved changes will be lost.`
-    );
+    // Focusing the dialog blurs the combo box, which would re-enter here
+    profileSwitchPending = true;
+    let confirmed;
+    try {
+      confirmed = await requestConfirm({
+        message:
+          `You have unsaved changes to profile "${activeProfile}". ` +
+          `Switch to "${name}" anyway? Unsaved changes will be lost.`,
+        confirmLabel: "Switch",
+        confirmClass: "secondary"
+      });
+    } finally {
+      profileSwitchPending = false;
+    }
     if (!confirmed) {
       setProfileComboValue(activeProfile);
       return;
@@ -567,7 +672,10 @@ deleteProfileBtn.addEventListener("click", async () => {
     return;
   }
 
-  const confirmed = confirm(`Delete profile "${name}"? This cannot be undone.`);
+  const confirmed = await requestConfirm({
+    message: `Delete profile "${name}"? This cannot be undone.`,
+    confirmLabel: "Delete"
+  });
   if (!confirmed) {
     return;
   }
