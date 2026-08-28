@@ -15,7 +15,7 @@ let profiles = {};
 let activeProfile = "";
 let viewMode = "json";
 let editingIndex = null;
-let suppressProfileChange = false;
+let highlightedProfile = "";
 let confirmOpen = false;
 let profileSwitchPending = false;
 
@@ -33,6 +33,7 @@ async function loadState() {
   enabledToggle.checked = state.enabled || false;
   jsonBox.value = headers.length > 0 ? serializeHeaders(headers) : "";
   setProfileComboValue(activeProfile);
+  highlightedProfile = activeProfile;
   renderProfiles();
   setView(state.viewMode || "json");
 }
@@ -510,6 +511,7 @@ async function saveToActiveProfile(toSave) {
 
   profiles[name] = { headers: toSave };
   activeProfile = name;
+  highlightedProfile = name;
   await browser.storage.local.set({ profiles, activeProfile: name });
   renderProfiles();
   setProfileComboValue(name);
@@ -573,9 +575,7 @@ enabledToggle.addEventListener("change", () => {
 // --- Profiles ---
 
 function setProfileComboValue(name) {
-  suppressProfileChange = true;
   profileCombo.value = name;
-  suppressProfileChange = false;
 }
 
 async function loadProfile(name) {
@@ -583,6 +583,8 @@ async function loadProfile(name) {
   headers = normalizeHeaders(profiles[name].headers);
   jsonBox.value = serializeHeaders(headers);
   setProfileComboValue(name);
+  highlightedProfile = name;
+  renderProfiles();
   try {
     await browser.storage.local.set({ activeProfile: name });
   } catch (err) {
@@ -597,18 +599,12 @@ async function loadProfile(name) {
 }
 
 async function trySwitchProfile(name) {
-  if (
-    profileSwitchPending ||
-    suppressProfileChange ||
-    !name ||
-    name === activeProfile ||
-    !profiles[name]
-  ) {
+  if (profileSwitchPending || !name || name === activeProfile || !profiles[name]) {
     return;
   }
 
   if (hasUnsavedProfileChanges()) {
-    // Focusing the dialog blurs the combo box, which would re-enter here
+    // Ignore further switch attempts while the dialog is waiting for an answer
     profileSwitchPending = true;
     let confirmed;
     try {
@@ -631,12 +627,35 @@ async function trySwitchProfile(name) {
   await loadProfile(name);
 }
 
-profileCombo.addEventListener("change", () => {
-  trySwitchProfile(profileCombo.value.trim());
+profileCombo.addEventListener("input", () => {
+  highlightProfile(firstMatchingProfile(profileCombo.value));
 });
 
-profileCombo.addEventListener("blur", () => {
-  trySwitchProfile(profileCombo.value.trim());
+profileCombo.addEventListener("keydown", (event) => {
+  const names = profileNames();
+  if (names.length === 0) {
+    return;
+  }
+
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const current = names.indexOf(highlightedProfile);
+    const next = current === -1
+      ? (step === 1 ? 0 : names.length - 1)
+      : (current + step + names.length) % names.length;
+    highlightProfile(names[next]);
+    return;
+  }
+
+  // Enter only switches to a highlighted profile; typing a brand new name
+  // leaves nothing highlighted, so it stays a no-op until Save is pressed
+  if (event.key === "Enter") {
+    event.preventDefault();
+    if (highlightedProfile) {
+      trySwitchProfile(highlightedProfile);
+    }
+  }
 });
 
 saveProfileBtn.addEventListener("click", async () => {
@@ -695,15 +714,107 @@ deleteProfileBtn.addEventListener("click", async () => {
   showStatus(`Profile "${name}" deleted`, "success");
 });
 
+function profileNames() {
+  return Object.keys(profiles).sort();
+}
+
 function renderProfiles() {
   profileOptions.innerHTML = "";
-  Object.keys(profiles).sort().forEach(name => {
-    const opt = document.createElement("option");
+  const names = profileNames();
+
+  if (!names.includes(highlightedProfile)) {
+    highlightedProfile = "";
+  }
+
+  if (names.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-list";
+    empty.textContent = "No saved profiles yet.";
+    profileOptions.appendChild(empty);
+    profileCombo.removeAttribute("aria-activedescendant");
+    return;
+  }
+
+  names.forEach((name, index) => {
+    const isActive = name === activeProfile;
     const count = profiles[name].headers.length;
-    opt.value = name;
-    opt.label = `${name} (${count} header${count === 1 ? "" : "s"})`;
-    profileOptions.appendChild(opt);
+
+    const row = document.createElement("div");
+    row.className = "profile-row" +
+      (isActive ? " active" : "") +
+      (name === highlightedProfile ? " highlighted" : "");
+    row.id = `profileRow${index}`;
+    row.dataset.name = name;
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", String(isActive));
+    row.title = isActive ? `${name} (active)` : name;
+
+    if (isActive) {
+      const dot = document.createElement("span");
+      dot.className = "profile-row-dot";
+      row.appendChild(dot);
+    }
+
+    const label = document.createElement("span");
+    label.className = "profile-row-name";
+    label.textContent = name;
+
+    const meta = document.createElement("span");
+    meta.className = "profile-row-count";
+    meta.textContent = `${count} header${count === 1 ? "" : "s"}`;
+
+    row.appendChild(label);
+    row.appendChild(meta);
+
+    // mousedown, so the row can keep focus in the name field
+    row.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      trySwitchProfile(name);
+    });
+
+    profileOptions.appendChild(row);
   });
+
+  syncProfileHighlight();
+}
+
+function syncProfileHighlight({ scroll = false } = {}) {
+  let activeDescendant = "";
+
+  profileOptions.querySelectorAll(".profile-row").forEach(row => {
+    const isHighlighted = row.dataset.name === highlightedProfile;
+    row.classList.toggle("highlighted", isHighlighted);
+    if (isHighlighted) {
+      activeDescendant = row.id;
+      if (scroll) {
+        row.scrollIntoView({ block: "nearest" });
+      }
+    }
+  });
+
+  if (activeDescendant) {
+    profileCombo.setAttribute("aria-activedescendant", activeDescendant);
+  } else {
+    profileCombo.removeAttribute("aria-activedescendant");
+  }
+}
+
+function highlightProfile(name) {
+  highlightedProfile = profiles[name] ? name : "";
+  syncProfileHighlight({ scroll: true });
+}
+
+// Type-ahead marks the first match rather than filtering the list, so every
+// profile stays reachable no matter what has been typed
+function firstMatchingProfile(text) {
+  const query = text.trim().toLowerCase();
+  if (!query) {
+    return "";
+  }
+  const names = profileNames();
+  return names.find(name => name.toLowerCase().startsWith(query)) ||
+    names.find(name => name.toLowerCase().includes(query)) ||
+    "";
 }
 
 function showStatus(message, type) {
